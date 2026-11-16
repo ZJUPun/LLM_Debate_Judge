@@ -1,0 +1,26 @@
+{
+  "dataset": "sample_pair",
+  "n": 100,
+  "seed": 0,
+  "methods": [
+    "judge",
+    "judge:k=3"
+  ],
+  "ref": null,
+  "out": "results/_mock_pair",
+  "workers": 8,
+  "budget": 10.0,
+  "category": null,
+  "split": null,
+  "model": "deepseek-flash",
+  "prices_per_M": {
+    "input_cache_miss": 0.3,
+    "input_cache_hit": 0.006,
+    "output": 1.2
+  },
+  "question_ids": [
+    "toy-pair-0",
+    "toy-pair-1",
+    "toy-pair-2"
+  ]
+}

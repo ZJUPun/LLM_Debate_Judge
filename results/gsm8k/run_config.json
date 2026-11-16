@@ -1,0 +1,46 @@
+{
+  "dataset": "gsm8k",
+  "n": 20,
+  "seed": 0,
+  "methods": [
+    "cot",
+    "sc:k=3",
+    "sc:k=6",
+    "sc:k=9",
+    "debate:n=3,r=2"
+  ],
+  "ref": "sc:k=9",
+  "out": null,
+  "workers": 8,
+  "budget": 10.0,
+  "category": null,
+  "split": null,
+  "model": "deepseek-flash",
+  "prices_per_M": {
+    "input_cache_miss": 0.3,
+    "input_cache_hit": 0.006,
+    "output": 1.2
+  },
+  "question_ids": [
+    "gsm8k-82",
+    "gsm8k-194",
+    "gsm8k-285",
+    "gsm8k-286",
+    "gsm8k-447",
+    "gsm8k-513",
+    "gsm8k-530",
+    "gsm8k-577",
+    "gsm8k-621",
+    "gsm8k-733",
+    "gsm8k-788",
+    "gsm8k-829",
+    "gsm8k-861",
+    "gsm8k-976",
+    "gsm8k-995",
+    "gsm8k-1033",
+    "gsm8k-1047",
+    "gsm8k-1090",
+    "gsm8k-1194",
+    "gsm8k-1266"
+  ]
+}

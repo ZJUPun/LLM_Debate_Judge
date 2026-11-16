@@ -1,0 +1,3 @@
+{"id": "toy-mc-0", "dataset": "sample_mc", "kind": "mc", "prompt": "The complementary color of blue is:\n\n(A) green\n(B) black\n(C) white\n(D) purple\n(E) red\n(F) orange\n(G) magenta\n(H) yellow\n(I) brown\n(J) cyan", "gold": "H", "meta": {"n_options": 10}}
+{"id": "toy-mc-1", "dataset": "sample_mc", "kind": "mc", "prompt": "Which gas do plants mainly take in for photosynthesis?\n\n(A) oxygen\n(B) nitrogen\n(C) carbon dioxide\n(D) helium", "gold": "C", "meta": {"n_options": 4}}
+{"id": "toy-mc-2", "dataset": "sample_mc", "kind": "mc", "prompt": "What is 7 x 8?\n\n(A) 54\n(B) 56\n(C) 58\n(D) 64", "gold": "B", "meta": {"n_options": 4}}

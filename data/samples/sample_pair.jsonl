@@ -1,0 +1,3 @@
+{"id": "toy-pair-0", "dataset": "sample_pair", "kind": "pair", "prompt": "What is 15% of 80?", "gold": "A", "meta": {"response_A": "15% of 80 is 0.15*80 = 12. Answer: 12", "response_B": "15% of 80 is 80/15 = 5.3. Answer: 5.3"}}
+{"id": "toy-pair-1", "dataset": "sample_pair", "kind": "pair", "prompt": "Is 91 a prime number?", "gold": "B", "meta": {"response_A": "91 is odd and not divisible by 3, so it is prime.", "response_B": "91 = 7 x 13, so it is not prime."}}
+{"id": "toy-pair-2", "dataset": "sample_pair", "kind": "pair", "prompt": "How many sides does a hexagon have?", "gold": "A", "meta": {"response_A": "A hexagon has 6 sides.", "response_B": "A hexagon has 8 sides."}}

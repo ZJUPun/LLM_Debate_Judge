@@ -1,0 +1,46 @@
+{
+  "dataset": "mmlu_pro",
+  "n": 20,
+  "seed": 0,
+  "methods": [
+    "cot",
+    "sc:k=3",
+    "sc:k=6",
+    "sc:k=9",
+    "debate:n=3,r=2"
+  ],
+  "ref": "sc:k=9",
+  "out": null,
+  "workers": 8,
+  "budget": 10.0,
+  "category": null,
+  "split": null,
+  "model": "deepseek-flash",
+  "prices_per_M": {
+    "input_cache_miss": 0.3,
+    "input_cache_hit": 0.006,
+    "output": 1.2
+  },
+  "question_ids": [
+    "mmlupro-740",
+    "mmlupro-1646",
+    "mmlupro-2382",
+    "mmlupro-2390",
+    "mmlupro-3700",
+    "mmlupro-4231",
+    "mmlupro-4369",
+    "mmlupro-4749",
+    "mmlupro-5111",
+    "mmlupro-6026",
+    "mmlupro-6475",
+    "mmlupro-6800",
+    "mmlupro-7059",
+    "mmlupro-7991",
+    "mmlupro-8145",
+    "mmlupro-8455",
+    "mmlupro-8563",
+    "mmlupro-8913",
+    "mmlupro-9748",
+    "mmlupro-10333"
+  ]
+}

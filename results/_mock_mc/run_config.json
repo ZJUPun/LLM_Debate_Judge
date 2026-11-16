@@ -1,0 +1,27 @@
+{
+  "dataset": "sample_mc",
+  "n": 100,
+  "seed": 0,
+  "methods": [
+    "cot",
+    "sc:k=5",
+    "debate:n=3,r=1"
+  ],
+  "ref": null,
+  "out": "results/_mock_mc",
+  "workers": 8,
+  "budget": 10.0,
+  "category": null,
+  "split": null,
+  "model": "deepseek-flash",
+  "prices_per_M": {
+    "input_cache_miss": 0.3,
+    "input_cache_hit": 0.006,
+    "output": 1.2
+  },
+  "question_ids": [
+    "toy-mc-0",
+    "toy-mc-1",
+    "toy-mc-2"
+  ]
+}

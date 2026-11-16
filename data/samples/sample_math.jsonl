@@ -1,0 +1,5 @@
+{"id": "toy-math-0", "dataset": "sample_math", "kind": "math", "prompt": "A baker makes 3 trays of 6 muffins and sells all of them. How many muffins did she sell?", "gold": "18", "meta": {}}
+{"id": "toy-math-1", "dataset": "sample_math", "kind": "math", "prompt": "Tom has 25 marbles. He gives 7 to Ana. How many marbles does Tom have left?", "gold": "18", "meta": {}}
+{"id": "toy-math-2", "dataset": "sample_math", "kind": "math", "prompt": "A bus ticket costs $4. How much do 5 tickets cost in dollars?", "gold": "20", "meta": {}}
+{"id": "toy-math-3", "dataset": "sample_math", "kind": "math", "prompt": "Mia reads 9 pages a day for 2 days. How many pages does she read?", "gold": "18", "meta": {}}
+{"id": "toy-math-4", "dataset": "sample_math", "kind": "math", "prompt": "There are 12 apples shared equally by 4 kids. How many apples does each kid get?", "gold": "3", "meta": {}}
