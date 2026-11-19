@@ -132,6 +132,24 @@ class Reply:
     reasoning: str = ""          # DeepSeek "thinking" text, if the model returns it
     usage: Usage = field(default_factory=Usage)
     cached: bool = False
+    finish_reason: str = ""      # "stop" | "length" | "content_filter" | ... ("" = unknown)
+    truncated: bool = False      # True iff the API stopped because max_tokens was reached
+
+    def __post_init__(self):
+        # `truncated` is always derived from finish_reason so the two cannot disagree.
+        if self.finish_reason == "length":
+            self.truncated = True
+
+
+def _is_truncated(finish_reason: str, output_tokens) -> bool:
+    """Did the model stop because it hit the max_tokens limit?
+
+    The API finish_reason is authoritative. Replies cached before truncation tracking
+    existed have no finish_reason, so fall back to "output tokens reached the limit".
+    """
+    if finish_reason:
+        return finish_reason == "length"
+    return output_tokens is not None and output_tokens >= config.DEFAULT_MAX_TOKENS
 
 
 def chat(messages, *, temperature: float = config.DEFAULT_TEMPERATURE,
@@ -161,25 +179,32 @@ def chat(messages, *, temperature: float = config.DEFAULT_TEMPERATURE,
                   output_tokens=hit["out"], cost_usd=price(hit["in"], hit["in_hit"], hit["out"]),
                   spent_usd=0.0)
         _record(u)
-        return Reply(hit["text"], hit.get("reasoning", ""), u, cached=True)
+        fr = hit.get("finish_reason", "")
+        return Reply(hit["text"], hit.get("reasoning", ""), u, cached=True,
+                     finish_reason=fr, truncated=_is_truncated(fr, hit["out"]))
 
     t0 = time.time()
     if config.MOCK:
-        text, reasoning, n_in, n_hit, n_out = _mock_reply(messages, sample_id)
+        text, reasoning, n_in, n_hit, n_out, finish_reason = _mock_reply(
+            messages, sample_id, max_tokens)
     else:
-        text, reasoning, n_in, n_hit, n_out = _api_call(model, messages, temperature,
-                                                        max_tokens, extra_body)
+        text, reasoning, n_in, n_hit, n_out, finish_reason = _api_call(
+            model, messages, temperature, max_tokens, extra_body)
+    truncated = _is_truncated(finish_reason, n_out)
     cost = price(n_in, n_hit, n_out)
     u = Usage(calls=1, input_tokens=n_in, input_cache_hit=n_hit, output_tokens=n_out,
               cost_usd=cost, spent_usd=cost)
     _record(u)
-    cache.put(key, {"text": text, "reasoning": reasoning, "in": n_in, "in_hit": n_hit, "out": n_out})
+    cache.put(key, {"text": text, "reasoning": reasoning, "in": n_in, "in_hit": n_hit,
+                    "out": n_out, "finish_reason": finish_reason})
     _log({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "tag": tag, "model": model,
           "temperature": temperature, "sample_id": sample_id, "messages": messages,
           "reply": text, "reasoning": reasoning, "input_tokens": n_in, "input_cache_hit": n_hit,
           "output_tokens": n_out, "cost_usd": round(cost, 6),
+          "finish_reason": finish_reason, "truncated": truncated, "max_tokens": max_tokens,
           "seconds": round(time.time() - t0, 2)})
-    return Reply(text, reasoning, u, cached=False)
+    return Reply(text, reasoning, u, cached=False, finish_reason=finish_reason,
+                 truncated=truncated)
 
 
 def _api_call(model, messages, temperature, max_tokens, extra_body):
@@ -192,12 +217,14 @@ def _api_call(model, messages, temperature, max_tokens, extra_body):
             if extra_body:
                 kw["extra_body"] = extra_body
             r = client.chat.completions.create(**kw)
-            msg = r.choices[0].message
+            choice = r.choices[0]
+            msg = choice.message
             us = r.usage
             n_in = us.prompt_tokens
             n_hit = getattr(us, "prompt_cache_hit_tokens", 0) or 0
+            finish_reason = getattr(choice, "finish_reason", "") or ""
             return (msg.content or "", getattr(msg, "reasoning_content", "") or "",
-                    n_in, n_hit, us.completion_tokens)
+                    n_in, n_hit, us.completion_tokens, finish_reason)
         except Exception as e:  # rate limits, timeouts, server errors
             if attempt == config.MAX_RETRIES - 1:
                 raise
@@ -208,10 +235,20 @@ def _api_call(model, messages, temperature, max_tokens, extra_body):
 
 # ----------------------------------------------------------------------------- mock model
 
-def _mock_reply(messages, sample_id):
-    """A fake model for offline testing. Answers are random but deterministic."""
+def _mock_reply(messages, sample_id, max_tokens=config.DEFAULT_MAX_TOKENS):
+    """A fake model for offline testing. Answers are random but deterministic.
+
+    Returns (text, reasoning, n_in, n_hit, n_out, finish_reason).
+    A configurable share of calls (config.MOCK_TRUNCATION_RATE) simulates the failure
+    mode observed in the paid runs: the model "thinks" until max_tokens and returns an
+    empty content, so finish_reason == "length" and there is no parsable answer.
+    """
     prompt = "\n".join(m["content"] for m in messages)
     rng = random.Random(hashlib.md5(f"{prompt}|{sample_id}".encode()).hexdigest())
+    n_in = len(prompt.split()) * 4 // 3
+    if rng.random() < config.MOCK_TRUNCATION_RATE:
+        return ("", "mock reasoning that runs into the max_tokens limit",
+                n_in, 0, max_tokens, "length")
     if '"winner"' in prompt:                                   # judge prompt
         text = json.dumps({"reasoning": "mock judge", "winner": rng.choice("AB")})
     elif re.search(r"\(J\)|\(D\)", prompt):                    # multiple choice
@@ -219,5 +256,4 @@ def _mock_reply(messages, sample_id):
         text = f"Some reasoning. Answer: {rng.choice(sorted(set(letters))[:4])}"
     else:                                                      # math
         text = f"Some reasoning. Answer: {rng.choice([18, 18, 18, 20, 3])}"
-    n_in = len(prompt.split()) * 4 // 3
-    return text, "", n_in, 0, len(text.split()) * 4 // 3 + 150
+    return (text, "", n_in, 0, len(text.split()) * 4 // 3 + 150, "stop")

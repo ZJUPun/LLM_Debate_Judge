@@ -37,3 +37,6 @@ SAMPLE_DATA_DIR = os.path.join(ROOT, "data", "samples")
 # --- Offline test mode -------------------------------------------------------
 # DJ_MOCK=1 replaces the API with a fake model so you can test the pipeline for free.
 MOCK = os.getenv("DJ_MOCK", "0") == "1"
+# Share of mock calls that simulate hitting max_tokens (finish_reason == "length")
+# and returning an empty answer, like the real paid runs did. 0 disables it.
+MOCK_TRUNCATION_RATE = float(os.getenv("DJ_MOCK_TRUNCATION_RATE", "0.2"))

@@ -12,16 +12,83 @@ import os
 import re
 import sys
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 
 from . import config, data, llm, report
 from .answers import is_correct
+from . import methods
 from .methods import METHODS, parse_spec
+
+
+METRICS_VERSION = 2   # bump when how a record is scored / classified changes
 
 
 def safe_name(spec: str) -> str:
     return re.sub(r"[^A-Za-z0-9=._-]+", "_", spec)
+
+
+class TruncationCounter:
+    """Counts, per question, how many model calls were cut off by the max_tokens limit.
+
+    Methods call `chat` imported into `dj.methods`, so patching `dj.llm.chat` is not
+    enough - we must swap the name in the methods module too. This only *observes* the
+    calls a method makes; it never changes what the method computes.
+    """
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.per_qid: dict[str, int] = {}
+        self.calls_per_qid: dict[str, int] = {}
+        self._orig = None
+
+    def __enter__(self):
+        self._orig = llm.chat
+        counter = self
+
+        def wrapped(messages, **kw):
+            reply = counter._orig(messages, **kw)
+            qid = _qid_from_tag(kw.get("tag", ""))
+            if qid is not None:
+                with counter.lock:
+                    counter.calls_per_qid[qid] = counter.calls_per_qid.get(qid, 0) + 1
+                    if reply.truncated:
+                        counter.per_qid[qid] = counter.per_qid.get(qid, 0) + 1
+            return reply
+
+        wrapped.__module__ = "dj.methods"   # cosmetic: keep tracebacks readable
+        llm.chat = wrapped
+        methods.chat = wrapped              # <- this is what methods actually call
+        return self
+
+    def __exit__(self, *exc):
+        llm.chat = self._orig
+        methods.chat = self._orig
+
+    def get(self, qid):
+        return self.per_qid.get(qid, 0), self.calls_per_qid.get(qid, 0)
+
+
+def _qid_from_tag(tag: str):
+    """'debate/gsm8k-513/a0/r0' -> 'gsm8k-513'. Tags are always '<method>/<qid>/...'."""
+    parts = tag.split("/")
+    return parts[1] if len(parts) > 1 and parts[1] else None
+
+
+def classify(error, pred, truncated):
+    """One label per question, used for the outcome breakdown in the report.
+
+    technical_error : the method raised an exception (API error, bad response, ...)
+    truncated       : at least one model call hit max_tokens and no usable answer came out
+    wrong           : an answer was produced (pred is not None) but it does not match gold
+    no_answer       : nothing parsable and no truncation (the model just did not answer)
+    """
+    if error:
+        return "technical_error"
+    if pred is None:
+        return "truncated" if truncated else "no_answer"
+    return "wrong"
 
 
 def run_method(spec, questions, out_dir, workers, budget):
@@ -46,17 +113,25 @@ def run_method(spec, questions, out_dir, workers, budget):
             return q, None, None, f"{type(e).__name__}: {e}"
 
     t0 = time.time()
-    with ThreadPoolExecutor(max_workers=workers) as ex:
+    counter = TruncationCounter()
+    with counter, ThreadPoolExecutor(max_workers=workers) as ex:
         futs = [ex.submit(one, q) for q in qs]
         for i, f in enumerate(as_completed(futs), 1):
             q, res, u, err = f.result()
             if err == "budget":
                 stopped = True
                 continue
+            pred = res.pred if res else None
+            truncated_calls, calls_made = counter.get(q.id)
             rec = {"method": spec, "qid": q.id, "dataset": q.dataset, "gold": q.gold,
-                   "pred": res.pred if res else None,
-                   "correct": bool(res and is_correct(res.pred, q.gold, q.kind)),
+                   "pred": pred,
+                   "correct": bool(res and is_correct(pred, q.gold, q.kind)),
                    "error": err, "usage": asdict(u) if u else None,
+                   # ---- outcome breakdown (v2 metrics), see classify() ----
+                   "outcome": classify(err, pred, truncated_calls > 0),
+                   "truncated_calls": truncated_calls,
+                   "calls_made": calls_made,
+                   "metrics_version": METRICS_VERSION,
                    "trace": res.trace if res else None}
             records[q.id] = rec
             if i % 10 == 0 or i == len(qs):
@@ -69,8 +144,10 @@ def run_method(spec, questions, out_dir, workers, budget):
             if q.id in records:
                 f.write(json.dumps(records[q.id], ensure_ascii=False) + "\n")
     errors = sum(1 for r in records.values() if r["error"])
+    n_trunc = sum(1 for r in records.values() if r.get("truncated_calls"))
     print(f"  done {spec} in {time.time() - t0:.0f}s -> {path}"
-          + (f"  ({errors} errors, counted as wrong)" if errors else ""))
+          + (f"  ({errors} errors, counted as wrong)" if errors else "")
+          + (f"  ({n_trunc} questions hit max_tokens={config.DEFAULT_MAX_TOKENS})" if n_trunc else ""))
     if stopped:
         print(f"!! Budget of ${budget:.2f} reached: {spec} is INCOMPLETE. Stopping.")
         sys.exit(1)
@@ -104,6 +181,9 @@ def main(argv=None):
           f"{' | MOCK MODE' if config.MOCK else ''} | budget ${a.budget:.2f}")
     with open(os.path.join(out, "run_config.json"), "w") as f:
         json.dump({**vars(a), "model": config.MODEL, "prices_per_M": config.PRICE_PER_M,
+                   "max_tokens": config.DEFAULT_MAX_TOKENS,
+                   "metrics_version": METRICS_VERSION,
+                   "mock": config.MOCK,
                    "question_ids": [q.id for q in questions]}, f, indent=2)
 
     for spec in a.methods:
