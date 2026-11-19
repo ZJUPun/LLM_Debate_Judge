@@ -31,3 +31,8 @@ results/_*/
 
 # --- Pycache inside subprojects ---
 debate-judge-baseline/**/__pycache__/
+
+# --- Run logs of background/one-off scripts ---
+*.log
+*.err
+scripts/_*.py
