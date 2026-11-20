@@ -30,10 +30,14 @@ def load_records(out_dir):
 
 
 def outcome_of(r):
-    """Outcome label of one record. Old records (metrics_version < 2) have no 'outcome'
-    field; they are re-classified here without modifying the saved files."""
-    if r.get("outcome"):
-        return r["outcome"]
+    """Outcome label of one record, re-derived from the authoritative per-record fields.
+
+    The stored 'outcome' field is ignored for the correct/wrong axis: the metrics-v2 run
+    wrote 'wrong' for correct answers (a bug in dj.run.classify). 'correct', 'error',
+    'pred' and 'truncated_calls' are authoritative, so the label is re-derived here and
+    saved files are never rewritten. Old records (metrics_version < 2) have no
+    'truncated_calls', so a missing answer falls back to 'no_answer'.
+    """
     if r.get("error"):
         return "technical_error"
     if r.get("correct"):

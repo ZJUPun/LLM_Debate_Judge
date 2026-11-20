@@ -38,6 +38,45 @@ These are the solutions from the other agents:
 Use the other agents' solutions as additional information. Check each solution carefully \
 (including your own), then give your updated solution. {format}"""
 
+# peers=0 control: the agent re-checks ONLY its own previous solution (no peers shown).
+# This separates social influence from the agent simply re-sampling its own answer.
+RECHECK_PROMPT = """{question}
+
+Your previous solution was:
+---
+{own}
+---
+
+Re-check your own solution carefully, then give your updated solution. {format}"""
+
+# style=verify: change the answer only after naming a specific error in your own reasoning.
+DEBATE_VERIFY_PROMPT = """{question}
+
+Your previous solution was:
+---
+{own}
+---
+
+These are the solutions from the other agents:
+{others}
+
+Check each solution carefully (including your own). You may change your answer ONLY if you can
+first name a specific error in your own previous reasoning; state that error explicitly, then
+give your updated solution. If you cannot name such an error, keep your original answer.
+{format}"""
+
+# style=verify combined with peers=0.
+RECHECK_VERIFY_PROMPT = """{question}
+
+Your previous solution was:
+---
+{own}
+---
+
+Re-check your own solution carefully. You may change your answer ONLY if you can first name a
+specific error in your own previous reasoning; state that error explicitly, then give your
+updated solution. If you cannot name such an error, keep your original answer. {format}"""
+
 JUDGE_PROMPT = """You are an impartial judge. Below is a question and two responses.
 Exactly one of the responses is correct. Decide which one.
 Do not let the order of the responses or their length influence you.
@@ -123,13 +162,20 @@ def self_consistency(q: Question, k=5, temperature=0.7):
 # ============================================================================= debate engine
 
 @register("debate")
-def debate(q: Question, n=3, r=2, agg="vote", stop=0, temperature=0.7):
+def debate(q: Question, n=3, r=2, agg="vote", stop=0, peers=None, style=None,
+           temperature=0.7):
     """Multi-agent debate.
-    n    : number of agents
-    r    : number of debate rounds AFTER round 0 (total calls = n * (r + 1) if no early stop)
-    agg  : "vote" (majority of the last round) or "judge" (LLM judge between the top-2 answers)
-    stop : 1 = stop early when all agents agree
+    n     : number of agents
+    r     : number of debate rounds AFTER round 0 (total calls = n * (r + 1) if no early stop)
+    agg   : "vote" (majority of the last round) or "judge" (LLM judge between the top-2 answers)
+    stop  : 1 = stop early when all agents agree
+    peers : 0 = no-peers control (each agent re-checks ONLY its own previous answer; no peer
+            solutions shown). Default (None) = show all other agents' solutions.
+    style : "verify" = verify-before-switch (an agent may change its answer only after naming
+            a specific error in its own previous reasoning). Default (None) = normal update.
     """
+    if style not in (None, "verify"):
+        raise SystemExit(f"debate: style must be 'verify' or omitted, got {style!r}")
     fmt = FORMAT[q.kind]
     # Round 0: every agent answers alone
     texts = [_answer_once(q, sample_id=i, temperature=temperature,
@@ -141,10 +187,15 @@ def debate(q: Question, n=3, r=2, agg="vote", stop=0, temperature=0.7):
             break
         new = []
         for i in range(n):   # all agents read the SAME snapshot (previous round)
-            others = "\n\n".join(f"Agent {j + 1}:\n---\n{texts[j]}\n---"
-                                 for j in range(n) if j != i)
-            prompt = DEBATE_UPDATE_PROMPT.format(question=q.prompt, own=texts[i],
-                                                 others=others, format=fmt)
+            own = texts[i]
+            if peers == 0:
+                tmpl = RECHECK_VERIFY_PROMPT if style == "verify" else RECHECK_PROMPT
+                prompt = tmpl.format(question=q.prompt, own=own, format=fmt)
+            else:
+                others = "\n\n".join(f"Agent {j + 1}:\n---\n{texts[j]}\n---"
+                                     for j in range(n) if j != i)
+                tmpl = DEBATE_VERIFY_PROMPT if style == "verify" else DEBATE_UPDATE_PROMPT
+                prompt = tmpl.format(question=q.prompt, own=own, others=others, format=fmt)
             new.append(chat(prompt, temperature=temperature, sample_id=i,
                             tag=f"debate/{q.id}/a{i}/r{rnd}").text)
         texts = new

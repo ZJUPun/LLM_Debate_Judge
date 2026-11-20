@@ -135,3 +135,34 @@ Keep it short and current: delete what is no longer true.
   - `.gitignore` now also covers `*.log`, `*.err` and `scripts/_*.py` (one-off helper scripts).
   - Next: decide how truncation should be handled before comparing methods; run the `claude`
     split; write `requirements.txt`.
+
+- **outcome-labeling fix, Sasipol**: `dj.run.classify()` stored `outcome="wrong"` for correct
+  answers (it never returned `"correct"`), so the report's outcome breakdown counted correct
+  questions under "wrong" (judgebench `judge` showed wrong=55, should be 1).
+  - `dj/report.py:outcome_of` now re-derives the label from the authoritative `correct`/`error`/
+    `pred`/`truncated_calls` fields instead of trusting the stored `outcome`. Saved records are
+    NOT rewritten; the old judgebench table re-summarises correctly (wrong=1 and wrong=4).
+  - `dj/run.py:classify` now takes `correct` and returns `"correct"` for correct answers, so new
+    records are stored correctly at write time too.
+  - `scripts/test_offline.sh` now clears `cache/llm_cache.sqlite.mock` first: a stale mock cache
+    (133/134 entries predating truncation tracking) was replaying "stop" replies and hiding
+    truncation, failing the structural check. Offline test is green again.
+
+- **flips analysis, Sasipol**: added `dj/flips.py` - read-only debate flip analysis for Q3
+  ("does debate correct errors or spread them?"). Counts per-agent answer changes across
+  rounds: W->R (corrected), R->W (spread), sideways W->W / R->R, switch-to-peer, plus the
+  round-0 vs final majority vote and per-agent trajectories (fixed / broken / corrected /
+  corrupted). Writes `flips.md` / `flips.json` / `flips_by_round.png` / `flips_examples.jsonl`
+  next to `table.md`. `dj/run.py` auto-runs it after any run that includes a debate method; it
+  also runs standalone (`python -m dj.flips results/<folder>`) for free on saved records.
+  Verified on mock + mmlu_pro records.
+
+- **peers=0 + style=verify, Sasipol**: added the two Q3 control/innovation variants to
+  `dj/methods.py:debate`.
+  - `peers=0`: no-peers control - each agent re-checks ONLY its own previous answer (no peer
+    solutions shown), separating social influence from re-sampling randomness.
+  - `style=verify`: verify-before-switch - an agent may change its answer only after naming a
+    specific error in its own previous reasoning (aims to cut R->W flips).
+  - Four update prompts now exist (normal/recheck x normal/verify). Round 0 is unchanged and
+    still shared with `sc` via the cache, so every debate variant starts from the same agents.
+  - `test_offline.sh` now exercises both variants; offline test green.

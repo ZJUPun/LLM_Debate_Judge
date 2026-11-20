@@ -16,7 +16,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 
-from . import config, data, llm, report
+from . import config, data, flips, llm, report
 from .answers import is_correct
 from . import methods
 from .methods import METHODS, parse_spec
@@ -76,19 +76,20 @@ def _qid_from_tag(tag: str):
     return parts[1] if len(parts) > 1 and parts[1] else None
 
 
-def classify(error, pred, truncated):
+def classify(error, pred, truncated, correct):
     """One label per question, used for the outcome breakdown in the report.
 
     technical_error : the method raised an exception (API error, bad response, ...)
     truncated       : at least one model call hit max_tokens and no usable answer came out
-    wrong           : an answer was produced (pred is not None) but it does not match gold
+    correct         : an answer was produced and matches gold
+    wrong           : an answer was produced but does not match gold
     no_answer       : nothing parsable and no truncation (the model just did not answer)
     """
     if error:
         return "technical_error"
     if pred is None:
         return "truncated" if truncated else "no_answer"
-    return "wrong"
+    return "correct" if correct else "wrong"
 
 
 def run_method(spec, questions, out_dir, workers, budget):
@@ -122,13 +123,14 @@ def run_method(spec, questions, out_dir, workers, budget):
                 stopped = True
                 continue
             pred = res.pred if res else None
+            correct = bool(res and is_correct(pred, q.gold, q.kind))
             truncated_calls, calls_made = counter.get(q.id)
             rec = {"method": spec, "qid": q.id, "dataset": q.dataset, "gold": q.gold,
                    "pred": pred,
-                   "correct": bool(res and is_correct(pred, q.gold, q.kind)),
+                   "correct": correct,
                    "error": err, "usage": asdict(u) if u else None,
                    # ---- outcome breakdown (v2 metrics), see classify() ----
-                   "outcome": classify(err, pred, truncated_calls > 0),
+                   "outcome": classify(err, pred, truncated_calls > 0, correct),
                    "truncated_calls": truncated_calls,
                    "calls_made": calls_made,
                    "metrics_version": METRICS_VERSION,
@@ -194,6 +196,8 @@ def main(argv=None):
     print(f"\nThis run: {llm.RUN_TOTAL.calls} calls, real money spent ${llm.RUN_TOTAL.spent_usd:.4f}")
     # table + plot include EVERY method saved in this folder (also from earlier runs)
     report.main([out, "--ref", a.ref or a.methods[0]])
+    if any(m.split(":")[0] == "debate" for m in a.methods):
+        flips.main([out])
 
 
 if __name__ == "__main__":
