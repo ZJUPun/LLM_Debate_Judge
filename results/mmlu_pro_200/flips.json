@@ -1,0 +1,143 @@
+{
+  "debate:n=3,r=2": {
+    "n_questions": 200,
+    "n_agents": 3,
+    "n_rounds": 3,
+    "round0_acc": 0.79,
+    "final_acc": 0.79,
+    "aggregate_flips": {
+      "n": 13,
+      "W->R": 5,
+      "R->W": 5
+    },
+    "agent_flips": {
+      "W->R": 28,
+      "R->W": 20,
+      "W->W": 18,
+      "R->R": 0,
+      "total": 66,
+      "wrong_opportunities": 287,
+      "right_opportunities": 913,
+      "W->R_rate": 0.0975609756097561,
+      "R->W_rate": 0.02190580503833516,
+      "W->R_switch_to_peer": 18,
+      "R->W_switch_to_peer": 13,
+      "W->R_switch_rate": 0.6428571428571429,
+      "R->W_switch_rate": 0.65
+    },
+    "per_transition": {
+      "r0->r1": {
+        "W->R": 17,
+        "R->W": 12,
+        "W->W": 11,
+        "R->R": 0
+      },
+      "r1->r2": {
+        "W->R": 11,
+        "R->W": 8,
+        "W->W": 7,
+        "R->R": 0
+      }
+    },
+    "trajectories": {
+      "fixed": 548,
+      "broken": 123,
+      "corrected": 21,
+      "corrupted": 13
+    }
+  },
+  "debate:n=3,r=2,peers=0": {
+    "n_questions": 200,
+    "n_agents": 3,
+    "n_rounds": 3,
+    "round0_acc": 0.79,
+    "final_acc": 0.785,
+    "aggregate_flips": {
+      "n": 7,
+      "W->R": 2,
+      "R->W": 3
+    },
+    "agent_flips": {
+      "W->R": 28,
+      "R->W": 42,
+      "W->W": 21,
+      "R->R": 0,
+      "total": 91,
+      "wrong_opportunities": 310,
+      "right_opportunities": 890,
+      "W->R_rate": 0.09032258064516129,
+      "R->W_rate": 0.04719101123595506,
+      "W->R_switch_to_peer": 25,
+      "R->W_switch_to_peer": 17,
+      "W->R_switch_rate": 0.8928571428571429,
+      "R->W_switch_rate": 0.40476190476190477
+    },
+    "per_transition": {
+      "r0->r1": {
+        "W->R": 9,
+        "R->W": 27,
+        "W->W": 10,
+        "R->R": 0
+      },
+      "r1->r2": {
+        "W->R": 19,
+        "R->W": 15,
+        "W->W": 11,
+        "R->R": 0
+      }
+    },
+    "trajectories": {
+      "fixed": 539,
+      "broken": 137,
+      "corrected": 6,
+      "corrupted": 20
+    }
+  },
+  "debate:n=3,r=2,style=verify": {
+    "n_questions": 200,
+    "n_agents": 3,
+    "n_rounds": 3,
+    "round0_acc": 0.79,
+    "final_acc": 0.81,
+    "aggregate_flips": {
+      "n": 10,
+      "W->R": 5,
+      "R->W": 1
+    },
+    "agent_flips": {
+      "W->R": 39,
+      "R->W": 33,
+      "W->W": 24,
+      "R->R": 0,
+      "total": 96,
+      "wrong_opportunities": 287,
+      "right_opportunities": 913,
+      "W->R_rate": 0.13588850174216027,
+      "R->W_rate": 0.03614457831325301,
+      "W->R_switch_to_peer": 31,
+      "R->W_switch_to_peer": 16,
+      "W->R_switch_rate": 0.7948717948717948,
+      "R->W_switch_rate": 0.48484848484848486
+    },
+    "per_transition": {
+      "r0->r1": {
+        "W->R": 21,
+        "R->W": 16,
+        "W->W": 13,
+        "R->R": 0
+      },
+      "r1->r2": {
+        "W->R": 18,
+        "R->W": 17,
+        "W->W": 11,
+        "R->R": 0
+      }
+    },
+    "trajectories": {
+      "fixed": 531,
+      "broken": 118,
+      "corrected": 20,
+      "corrupted": 14
+    }
+  }
+}
