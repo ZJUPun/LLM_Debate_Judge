@@ -10,40 +10,55 @@
       "W->R": 0,
       "R->W": 2
     },
-    "agent_flips": {
-      "W->R": 6,
-      "R->W": 13,
-      "W->W": 6,
+    "genuine_flips": {
+      "W->R": 0,
+      "R->W": 7,
+      "W->W": 2,
       "R->R": 0,
-      "total": 25,
-      "wrong_opportunities": 45,
+      "total": 9,
+      "wrong_opportunities": 31,
       "right_opportunities": 1155,
-      "W->R_rate": 0.13333333333333333,
-      "R->W_rate": 0.011255411255411256,
-      "W->R_switch_to_peer": 6,
-      "R->W_switch_to_peer": 7,
-      "W->R_switch_rate": 1.0,
-      "R->W_switch_rate": 0.5384615384615384
+      "W->R_rate": 0.0,
+      "R->W_rate": 0.006060606060606061,
+      "W->R_switch_to_peer": 0,
+      "R->W_switch_to_peer": 3,
+      "W->R_switch_rate": 0.0,
+      "R->W_switch_rate": 0.42857142857142855
+    },
+    "no_answer_transitions": {
+      "none->R": 6,
+      "none->W": 2,
+      "R->none": 6,
+      "W->none": 2,
+      "total": 16
     },
     "per_transition": {
       "r0->r1": {
-        "W->R": 2,
-        "R->W": 7,
-        "W->W": 2,
-        "R->R": 0
+        "W->R": 0,
+        "R->W": 3,
+        "W->W": 0,
+        "R->R": 0,
+        "none->R": 2,
+        "none->W": 2,
+        "R->none": 4,
+        "W->none": 0
       },
       "r1->r2": {
-        "W->R": 4,
-        "R->W": 6,
-        "W->W": 4,
-        "R->R": 0
+        "W->R": 0,
+        "R->W": 4,
+        "W->W": 2,
+        "R->R": 0,
+        "none->R": 4,
+        "none->W": 0,
+        "R->none": 2,
+        "W->none": 2
       }
     },
     "trajectories": {
       "fixed": 583,
-      "broken": 18,
+      "broken": 13,
       "corrected": 0,
-      "corrupted": 7
+      "corrupted": 6
     }
   },
   "debate:n=3,r=2,peers=0": {
@@ -57,40 +72,55 @@
       "W->R": 0,
       "R->W": 3
     },
-    "agent_flips": {
-      "W->R": 14,
-      "R->W": 26,
-      "W->W": 10,
+    "genuine_flips": {
+      "W->R": 3,
+      "R->W": 7,
+      "W->W": 3,
       "R->R": 0,
-      "total": 50,
-      "wrong_opportunities": 60,
+      "total": 13,
+      "wrong_opportunities": 34,
       "right_opportunities": 1140,
-      "W->R_rate": 0.23333333333333334,
-      "R->W_rate": 0.02280701754385965,
-      "W->R_switch_to_peer": 12,
-      "R->W_switch_to_peer": 7,
-      "W->R_switch_rate": 0.8571428571428571,
-      "R->W_switch_rate": 0.2692307692307692
+      "W->R_rate": 0.08823529411764706,
+      "R->W_rate": 0.0061403508771929825,
+      "W->R_switch_to_peer": 1,
+      "R->W_switch_to_peer": 0,
+      "W->R_switch_rate": 0.3333333333333333,
+      "R->W_switch_rate": 0.0
+    },
+    "no_answer_transitions": {
+      "none->R": 11,
+      "none->W": 4,
+      "R->none": 19,
+      "W->none": 3,
+      "total": 37
     },
     "per_transition": {
       "r0->r1": {
-        "W->R": 1,
-        "R->W": 21,
-        "W->W": 4,
-        "R->R": 0
+        "W->R": 0,
+        "R->W": 7,
+        "W->W": 1,
+        "R->R": 0,
+        "none->R": 1,
+        "none->W": 2,
+        "R->none": 14,
+        "W->none": 1
       },
       "r1->r2": {
-        "W->R": 13,
-        "R->W": 5,
-        "W->W": 6,
-        "R->R": 0
+        "W->R": 3,
+        "R->W": 0,
+        "W->W": 2,
+        "R->R": 0,
+        "none->R": 10,
+        "none->W": 2,
+        "R->none": 5,
+        "W->none": 2
       }
     },
     "trajectories": {
       "fixed": 570,
-      "broken": 19,
+      "broken": 12,
       "corrected": 0,
-      "corrupted": 12
+      "corrupted": 5
     }
   },
   "debate:n=3,r=2,style=verify": {
@@ -104,40 +134,55 @@
       "W->R": 0,
       "R->W": 2
     },
-    "agent_flips": {
-      "W->R": 6,
-      "R->W": 23,
-      "W->W": 8,
+    "genuine_flips": {
+      "W->R": 0,
+      "R->W": 6,
+      "W->W": 3,
       "R->R": 0,
-      "total": 37,
-      "wrong_opportunities": 49,
+      "total": 9,
+      "wrong_opportunities": 32,
       "right_opportunities": 1151,
-      "W->R_rate": 0.12244897959183673,
-      "R->W_rate": 0.01998262380538662,
-      "W->R_switch_to_peer": 4,
-      "R->W_switch_to_peer": 8,
-      "W->R_switch_rate": 0.6666666666666666,
-      "R->W_switch_rate": 0.34782608695652173
+      "W->R_rate": 0.0,
+      "R->W_rate": 0.005212858384013901,
+      "W->R_switch_to_peer": 0,
+      "R->W_switch_to_peer": 2,
+      "W->R_switch_rate": 0.0,
+      "R->W_switch_rate": 0.3333333333333333
+    },
+    "no_answer_transitions": {
+      "none->R": 6,
+      "none->W": 5,
+      "R->none": 17,
+      "W->none": 0,
+      "total": 28
     },
     "per_transition": {
       "r0->r1": {
-        "W->R": 1,
-        "R->W": 10,
-        "W->W": 3,
-        "R->R": 0
+        "W->R": 0,
+        "R->W": 4,
+        "W->W": 1,
+        "R->R": 0,
+        "none->R": 1,
+        "none->W": 2,
+        "R->none": 6,
+        "W->none": 0
       },
       "r1->r2": {
-        "W->R": 5,
-        "R->W": 13,
-        "W->W": 5,
-        "R->R": 0
+        "W->R": 0,
+        "R->W": 2,
+        "W->W": 2,
+        "R->R": 0,
+        "none->R": 5,
+        "none->W": 3,
+        "R->none": 11,
+        "W->none": 0
       }
     },
     "trajectories": {
       "fixed": 568,
-      "broken": 18,
-      "corrected": 2,
-      "corrupted": 19
+      "broken": 13,
+      "corrected": 0,
+      "corrupted": 6
     }
   }
 }

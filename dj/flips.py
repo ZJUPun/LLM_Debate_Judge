@@ -14,15 +14,21 @@ Definitions (per agent, per consecutive round pair r -> r+1):
   switch-to-peer  : the new answer was one a peer held in the previous round (social
                     influence), rather than a novel answer.
 
+Truncation vs genuine flips:
+  `None` means "no parsable answer", usually a call that hit max_tokens. A transition to or
+  from `None` is a truncation artifact, NOT a genuine W/R flip, so it is counted separately
+  as a no-answer transition (`none->R`, `none->W`, `R->none`, `W->none`). Genuine flips
+  require BOTH answers to be non-None.
+
 Rates:
-  W->R rate = W->R flips / wrong answers available to correct (a wrong answer at the start
-  of a transition). R->W rate = R->W flips / right answers available to corrupt.
+  W->R rate = W->R flips / wrong (non-None) answers available to correct.
+  R->W rate = R->W flips / right (non-None) answers available to corrupt.
 
 Outputs (next to table.md):
   flips.md               summary table
   flips.json             the same numbers as structured data
-  flips_by_round.png     W->R vs R->W per round transition
-  flips_examples.jsonl   one line per W->R / R->W flip, for error analysis
+  flips_by_round.png     genuine W->R vs R->W per round transition
+  flips_examples.jsonl   one line per genuine W->R / R->W flip, for error analysis
 """
 from __future__ import annotations
 
@@ -38,7 +44,9 @@ DATASET_KIND = {
     "mmlu_pro": "mc", "sample_mc": "mc",
     "judgebench": "pair", "sample_pair": "pair",
 }
-FLIPS = ("W->R", "R->W", "W->W", "R->R")
+GENUINE_FLIPS = ("W->R", "R->W", "W->W", "R->R")
+NOANSWER_FLIPS = ("none->R", "none->W", "R->none", "W->none")
+ALL_FLIPS = GENUINE_FLIPS + NOANSWER_FLIPS
 
 
 def _kind_of(rec) -> str:
@@ -61,17 +69,33 @@ def _per_question(rec):
     events = []
     per_transition = {}
     wrong_opp = right_opp = 0
+    no_answer = {t: 0 for t in NOANSWER_FLIPS}
 
     for r in range(len(preds) - 1):
         cur, nxt = preds[r], preds[r + 1]
-        counts = {t: 0 for t in FLIPS}
+        counts = {t: 0 for t in ALL_FLIPS}
         for i in range(n_agents):
             prev, new = cur[i], nxt[i]
-            pc, nc = is_correct(prev, gold, qkind), is_correct(new, gold, qkind)
-            wrong_opp += int(not pc)
-            right_opp += int(pc)
+            # opportunities: only genuine (non-None) answers at the start of a transition
+            # are eligible to be corrected/corrupted.
+            if prev is not None:
+                if is_correct(prev, gold, qkind):
+                    right_opp += 1
+                else:
+                    wrong_opp += 1
             if prev == new:
                 continue
+            # no-answer (truncation) transition: one side is None -> not a genuine flip.
+            if prev is None or new is None:
+                if new is None:
+                    ftype = "R->none" if is_correct(prev, gold, qkind) else "W->none"
+                else:
+                    ftype = "none->R" if is_correct(new, gold, qkind) else "none->W"
+                no_answer[ftype] += 1
+                counts[ftype] += 1
+                continue
+            # genuine flip: both answers non-None.
+            pc, nc = is_correct(prev, gold, qkind), is_correct(new, gold, qkind)
             if pc == nc:
                 ftype = "W->W" if not nc else "R->R"
             else:
@@ -93,14 +117,18 @@ def _per_question(rec):
         traj = [p[i] for p in preds]
         if all(t == traj[0] for t in traj):
             fixed += 1
-        if all(not is_correct(t, gold, qkind) for t in traj):
+        # broken = always a genuine (non-None) wrong answer; None is truncation, not "wrong".
+        if all(t is not None and not is_correct(t, gold, qkind) for t in traj):
             broken += 1
-        sc, ec = is_correct(traj[0], gold, qkind), is_correct(traj[-1], gold, qkind)
-        if sc != ec:
-            if ec:
-                corrected += 1
-            else:
-                corrupted += 1
+        # corrected/corrupted only make sense for trajectories that start and end with a
+        # genuine (non-None) answer.
+        if traj[0] is not None and traj[-1] is not None:
+            sc, ec = is_correct(traj[0], gold, qkind), is_correct(traj[-1], gold, qkind)
+            if sc != ec:
+                if ec:
+                    corrected += 1
+                else:
+                    corrupted += 1
 
     return {
         "qid": rec.get("qid"), "n_agents": n_agents, "n_rounds": len(rounds),
@@ -108,7 +136,7 @@ def _per_question(rec):
         "round0_correct": is_correct(votes[0], gold, qkind),
         "final_correct": is_correct(votes[-1], gold, qkind),
         "events": events, "per_transition": per_transition,
-        "wrong_opp": wrong_opp, "right_opp": right_opp,
+        "wrong_opp": wrong_opp, "right_opp": right_opp, "no_answer": no_answer,
         "fixed": fixed, "broken": broken, "corrected": corrected, "corrupted": corrupted,
     }
 
@@ -120,8 +148,9 @@ def _aggregate(recs):
     if n == 0:
         return None
 
-    flips = {t: 0 for t in FLIPS}
+    flips = {t: 0 for t in GENUINE_FLIPS}
     switch = {"W->R": 0, "R->W": 0}
+    no_answer = {t: 0 for t in NOANSWER_FLIPS}
     per_transition = {}
     wrong_opp = right_opp = 0
     round0_correct = final_correct = 0
@@ -140,15 +169,18 @@ def _aggregate(recs):
                 agg["R->W"] += 1
         wrong_opp += d["wrong_opp"]
         right_opp += d["right_opp"]
+        for t in GENUINE_FLIPS:
+            flips[t] += sum(1 for e in d["events"] if e["flip"] == t)
+        for t in NOANSWER_FLIPS:
+            no_answer[t] += d["no_answer"][t]
         for e in d["events"]:
-            flips[e["flip"]] += 1
             if e["flip"] in ("W->R", "R->W"):
                 if e["switch_to_peer"]:
                     switch[e["flip"]] += 1
                 examples.append(e)
         for label, counts in d["per_transition"].items():
-            per_transition.setdefault(label, {t: 0 for t in FLIPS})
-            for t in FLIPS:
+            per_transition.setdefault(label, {t: 0 for t in ALL_FLIPS})
+            for t in ALL_FLIPS:
                 per_transition[label][t] += counts[t]
         for k in traj:
             traj[k] += d[k]
@@ -160,7 +192,7 @@ def _aggregate(recs):
         "round0_acc": round0_correct / n,
         "final_acc": final_correct / n,
         "aggregate_flips": agg,
-        "agent_flips": {
+        "genuine_flips": {
             **flips, "total": sum(flips.values()),
             "wrong_opportunities": wrong_opp,
             "right_opportunities": right_opp,
@@ -171,6 +203,7 @@ def _aggregate(recs):
             "W->R_switch_rate": switch["W->R"] / flips["W->R"] if flips["W->R"] else 0.0,
             "R->W_switch_rate": switch["R->W"] / flips["R->W"] if flips["R->W"] else 0.0,
         },
+        "no_answer_transitions": {**no_answer, "total": sum(no_answer.values())},
         "per_transition": per_transition,
         "trajectories": traj,
         "examples": examples,
@@ -187,35 +220,39 @@ def _render_md(by_method):
     lines = [
         "# Debate flips",
         "",
-        "**Flip** = one agent changes its answer between two consecutive rounds. "
-        "**W->R** = a wrong answer was corrected (debate fixes); **R->W** = a right answer "
-        "was abandoned for a wrong one (debate spreads). **W->W / R->R** = sideways moves "
-        "(answer changed, correctness unchanged). **switch-to-peer** = the new answer was "
-        "one a peer held in the previous round. Rates are over the answers eligible to "
-        "change (W->R rate = W->R / wrong answers; R->W rate = R->W / right answers).",
+        "**Genuine flip** = one agent changes its (non-empty) answer between two consecutive "
+        "rounds. **W->R** = a wrong answer was corrected (debate fixes); **R->W** = a right "
+        "answer was abandoned for a wrong one (debate spreads). **W->W / R->R** = sideways "
+        "(answer changed, correctness unchanged). **switch-to-peer** = the new answer was one "
+        "a peer held in the previous round. Rates are over the genuine (non-empty) answers "
+        "eligible to change.",
+        "",
+        "A transition to/from `none` (no parsable answer) is a **truncation artifact**, not a "
+        "genuine flip: it is reported separately under \"No-answer transitions\" and excluded "
+        "from the W->R / R->W rates.",
         "",
         "## Per method",
         "",
-        "| Method | n | Round-0 acc | Final acc | Agg. flips (n / W->R / R->W) | Agent W->R (rate) | Agent R->W (rate) | W->R switch | R->W switch | Trajectories (fixed / broken / corrected / corrupted) |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Method | n | Round-0 acc | Final acc | Agg. flips (n / W->R / R->W) | Genuine W->R (rate) | Genuine R->W (rate) | W->R switch | R->W switch | No-answer trans. | Trajectories (fixed / broken / corrected / corrupted) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for m, s in by_method.items():
-        a = s["agent_flips"]
+        g = s["genuine_flips"]
         t = s["trajectories"]
         lines.append(
             f"| {m} | {s['n_questions']} | {_pct(s['round0_acc'])} | {_pct(s['final_acc'])} | "
             f"{s['aggregate_flips']['n']} / {s['aggregate_flips']['W->R']} / {s['aggregate_flips']['R->W']} | "
-            f"{a['W->R']} ({_pct(a['W->R_rate'])}) | {a['R->W']} ({_pct(a['R->W_rate'])}) | "
-            f"{_pct(a['W->R_switch_rate'])} | {_pct(a['R->W_switch_rate'])} | "
+            f"{g['W->R']} ({_pct(g['W->R_rate'])}) | {g['R->W']} ({_pct(g['R->W_rate'])}) | "
+            f"{_pct(g['W->R_switch_rate'])} | {_pct(g['R->W_switch_rate'])} | "
+            f"{s['no_answer_transitions']['total']} | "
             f"{t['fixed']} / {t['broken']} / {t['corrected']} / {t['corrupted']} |")
 
-    # per-round table: union of transition labels across methods
     all_labels = []
     for s in by_method.values():
         for label in s["per_transition"]:
             if label not in all_labels:
                 all_labels.append(label)
-    lines += ["", "## Per round (W->R / R->W)", ""]
+    lines += ["", "## Genuine flips per round (W->R / R->W)", ""]
     header = "| Method |" + "".join(f" {lab} |" for lab in all_labels)
     lines += [header, "|" + "---|" * (len(all_labels) + 1)]
     for m, s in by_method.items():
@@ -227,9 +264,9 @@ def _render_md(by_method):
 
     lines += [
         "",
-        "Trajectory legend: **fixed** = never changed answer; **broken** = wrong in every "
-        "round; **corrected** = wrong at round 0, right at the end; **corrupted** = right at "
-        "round 0, wrong at the end.",
+        "Trajectory legend (per agent): **fixed** = never changed answer; **broken** = always "
+        "a genuine wrong answer (never `none`); **corrected** = genuine wrong -> right from "
+        "round 0 to the end; **corrupted** = genuine right -> wrong.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -259,8 +296,8 @@ def _plot(by_method, out_dir):
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels)
     ax.set_xlabel("Round transition")
-    ax.set_ylabel("Number of flips")
-    ax.set_title("Flips by round (W->R vs R->W)")
+    ax.set_ylabel("Number of genuine flips")
+    ax.set_title("Genuine flips by round (W->R vs R->W)")
     ax.grid(alpha=0.3)
     ax.legend(fontsize=8)
     fig.tight_layout()
@@ -295,7 +332,6 @@ def main(argv=None):
     md = _render_md(summaries)
     with open(os.path.join(a.out_dir, "flips.md"), "w", encoding="utf-8") as f:
         f.write(md)
-    # json: drop the verbose examples; keep counts (examples go to their own file)
     with open(os.path.join(a.out_dir, "flips.json"), "w", encoding="utf-8") as f:
         json.dump({m: {k: v for k, v in s.items() if k != "examples"}
                    for m, s in summaries.items()}, f, indent=2)
@@ -310,7 +346,7 @@ def main(argv=None):
     print(md)
     _plot(summaries, a.out_dir)
     print(f"Wrote flips.md, flips.json, flips_examples.jsonl "
-          f"({len(examples)} W->R/R->W examples) in {a.out_dir}")
+          f"({len(examples)} genuine W->R/R->W examples) in {a.out_dir}")
 
 
 if __name__ == "__main__":
