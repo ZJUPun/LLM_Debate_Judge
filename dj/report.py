@@ -190,36 +190,70 @@ def _plot(rows, out_dir):
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib.lines import Line2D
+        from matplotlib.ticker import FuncFormatter
     except ImportError:
         print("(matplotlib not installed: no plot)")
         return
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.8), sharex=True)
+
+    # Short labels + color by FAMILY (3 colorblind-safe hues):
+    #   CoT = gray reference, self-consistency = blue (the baseline curve),
+    #   debate = orange (the method under test), variants by marker shape.
+    def style(m):
+        if m == "cot":
+            return {"label": "CoT", "color": "#52514e", "marker": "o", "ms": 6.5}
+        if m.startswith("sc"):
+            return {"label": f"SC k={m.split('k=')[1]}", "color": "#2a78d6",
+                    "marker": "o", "ms": 6.5}
+        if "peers=0" in m:
+            return {"label": "Debate · no peers", "color": "#eb6834", "marker": "s", "ms": 6}
+        if "style=verify" in m:
+            return {"label": "Debate · verify", "color": "#eb6834", "marker": "D", "ms": 5.5}
+        return {"label": "Debate", "color": "#eb6834", "marker": "o", "ms": 6.5}
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.8), sharex=True)
 
     def draw(ax, acc_key, lo_key, hi_key, title):
-        for i, (m, s) in enumerate(rows):
-            x, y = s["cost_per_q"] * 1000, 100 * s[acc_key]
-            ax.errorbar(x, y, yerr=[[y - 100 * s[lo_key]], [100 * s[hi_key] - y]],
-                        fmt="o", capsize=4)
-            ax.annotate(m, (x, y), textcoords="offset points",
-                        xytext=(6, 6 if i % 2 else -12), fontsize=8)
-        # connect self-consistency points to show the "same-cost" baseline curve
-        sc = sorted([(s["cost_per_q"] * 1000, 100 * s[acc_key])
-                     for m, s in rows if m.startswith("sc")])
+        for m, s in rows:
+            st = style(m)
+            x, y = s["cost_per_q"], 100 * s[acc_key]
+            lo, hi = 100 * s[lo_key], 100 * s[hi_key]
+            ax.errorbar(x, y, yerr=[[y - lo], [hi - y]], fmt=st["marker"],
+                        color=st["color"], ms=st["ms"], capsize=3,
+                        lw=0.9, elinewidth=0.9, markeredgewidth=0.9, zorder=3)
+        # self-consistency curve = the same-cost baseline debate must beat
+        sc = sorted([(s["cost_per_q"], 100 * s[acc_key]) for m, s in rows if m.startswith("sc")])
         if len(sc) > 1:
-            ax.plot(*zip(*sc), "--", color="gray", lw=1, label="self-consistency curve")
-            ax.legend(fontsize=8)
-        ax.set_xlabel("Cost per question (US$ x 1000)")
-        ax.set_ylabel("Accuracy (%)  with 95% CI")
-        ax.set_title(title)
-        ax.grid(alpha=0.3)
+            ax.plot(*zip(*sc), "--", color="#2a78d6", lw=1.2, alpha=0.45, zorder=2)
+        ax.set_xlabel("Cost per question (US$)")
+        ax.set_ylabel("Accuracy (%)")
+        ax.set_title(title, fontsize=10)
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"${v:.3f}"))
+        ax.grid(alpha=0.25, lw=0.5)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
 
     draw(axes[0], "acc", "ci_lo", "ci_hi", "All questions (non-answers = wrong)")
     draw(axes[1], "acc_answered", "acc_answered_ci_lo", "acc_answered_ci_hi",
          "Answered questions only")
-    fig.suptitle(f"Accuracy vs. cost - {os.path.basename(os.path.normpath(out_dir))}")
-    fig.tight_layout()
+
+    # one shared legend below the figure
+    handles, seen = [], set()
+    for m, _s in rows:
+        st = style(m)
+        if st["label"] in seen:
+            continue
+        seen.add(st["label"])
+        handles.append(Line2D([0], [0], marker=st["marker"], color="none",
+                              markerfacecolor=st["color"], markeredgecolor=st["color"],
+                              markersize=6, label=st["label"]))
+    fig.suptitle(f"Accuracy vs. cost — {os.path.basename(os.path.normpath(out_dir))}",
+                 fontsize=11)
+    fig.tight_layout(rect=[0, 0.02, 1, 0.93])
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False,
+               fontsize=8, bbox_to_anchor=(0.5, -0.02))
     path = os.path.join(out_dir, "accuracy_vs_cost.png")
-    fig.savefig(path, dpi=150)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
     print(f"\nSaved {os.path.join(out_dir, 'table.md')} and {path}")
 
 
