@@ -112,11 +112,13 @@ def _per_question(rec):
             })
         per_transition[f"r{r}->r{r + 1}"] = counts
 
-    fixed = broken = corrected = corrupted = 0
+    fixed = empty = broken = corrected = corrupted = 0
     for i in range(n_agents):
         traj = [p[i] for p in preds]
-        if all(t == traj[0] for t in traj):
-            fixed += 1
+        if all(t is None for t in traj):
+            empty += 1                          # never produced an answer (truncation)
+        elif all(t == traj[0] for t in traj):
+            fixed += 1                          # never changed a REAL answer
         # broken = always a genuine (non-None) wrong answer; None is truncation, not "wrong".
         if all(t is not None and not is_correct(t, gold, qkind) for t in traj):
             broken += 1
@@ -137,7 +139,8 @@ def _per_question(rec):
         "final_correct": is_correct(votes[-1], gold, qkind),
         "events": events, "per_transition": per_transition,
         "wrong_opp": wrong_opp, "right_opp": right_opp, "no_answer": no_answer,
-        "fixed": fixed, "broken": broken, "corrected": corrected, "corrupted": corrupted,
+        "fixed": fixed, "empty": empty, "broken": broken,
+        "corrected": corrected, "corrupted": corrupted,
     }
 
 
@@ -155,7 +158,7 @@ def _aggregate(recs):
     wrong_opp = right_opp = 0
     round0_correct = final_correct = 0
     agg = {"n": 0, "W->R": 0, "R->W": 0}
-    traj = {"fixed": 0, "broken": 0, "corrected": 0, "corrupted": 0}
+    traj = {"fixed": 0, "empty": 0, "broken": 0, "corrected": 0, "corrupted": 0}
     examples = []
 
     for d in per_q:
@@ -233,7 +236,7 @@ def _render_md(by_method):
         "",
         "## Per method",
         "",
-        "| Method | n | Round-0 acc | Final acc | Agg. flips (n / W->R / R->W) | Genuine W->R (rate) | Genuine R->W (rate) | W->R switch | R->W switch | No-answer trans. | Trajectories (fixed / broken / corrected / corrupted) |",
+        "| Method | n | Round-0 acc | Final acc | Agg. flips (n / W->R / R->W) | Genuine W->R (rate) | Genuine R->W (rate) | W->R switch | R->W switch | No-answer trans. | Trajectories (fixed / empty / broken / corrected / corrupted) |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for m, s in by_method.items():
@@ -245,7 +248,7 @@ def _render_md(by_method):
             f"{g['W->R']} ({_pct(g['W->R_rate'])}) | {g['R->W']} ({_pct(g['R->W_rate'])}) | "
             f"{_pct(g['W->R_switch_rate'])} | {_pct(g['R->W_switch_rate'])} | "
             f"{s['no_answer_transitions']['total']} | "
-            f"{t['fixed']} / {t['broken']} / {t['corrected']} / {t['corrupted']} |")
+            f"{t['fixed']} / {t['empty']} / {t['broken']} / {t['corrected']} / {t['corrupted']} |")
 
     all_labels = []
     for s in by_method.values():
@@ -264,9 +267,10 @@ def _render_md(by_method):
 
     lines += [
         "",
-        "Trajectory legend (per agent): **fixed** = never changed answer; **broken** = always "
-        "a genuine wrong answer (never `none`); **corrected** = genuine wrong -> right from "
-        "round 0 to the end; **corrupted** = genuine right -> wrong.",
+        "Trajectory legend (per agent): **fixed** = never changed a real answer; **empty** = "
+        "never produced an answer (truncated every round); **broken** = always a genuine wrong "
+        "answer (never `none`); **corrected** = genuine wrong -> right; **corrupted** = genuine "
+        "right -> wrong.",
     ]
     return "\n".join(lines) + "\n"
 
